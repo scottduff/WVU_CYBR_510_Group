@@ -1,0 +1,186 @@
+#CYBR 510
+#Homework #4
+
+#09/25/2022
+
+#Group Members
+
+#Scott Duff
+#Ghislain Ajuah
+#Brian Lewis
+#Pepper Reasnover
+#Maurice Robertson
+
+#Windows 11 Version:
+#Major  Minor  Build  Revision
+#-----  -----  -----  --------
+#10     0      22621  0
+#Powershell Version:
+#Major  Minor  Build  Revision
+#-----  -----  -----  --------
+#5      1      22000  832
+
+#This is a looping function that generates a menu.
+
+function adminMenu {
+    do {
+    Write-Host "` "
+    Write-Host "============== Auditing Tools=============="
+    Write-Host "` 1: ping `$target Export"
+    Write-Host "` 2: ipconfig /all Export"
+    Write-Host "` 3: secedit Export"
+    Write-Host "` 4: get-acl of directories (recursive) Export"
+    Write-Host "` 5: get-acl of HKey Current User Export"
+    Write-Host "` 6: get the uptime of the host Export"
+    Write-Host "` 7: Opens the Get-ChildItem Menu to view directories and sub directories."
+    Write-Host "` Q: Quit Program"
+    Write-Host "==========================================="
+    $choice = Read-Host "`nEnter Choice"
+    } until (($choice -eq '1') -or ($choice -eq '2') -or ($choice -eq '3') -or ($choice -eq '4') -or ($choice -eq '5') -or ($choice -eq 'Q') -or ($choice -eq '6') -or ($choice -eq '7'))
+    switch ($choice) {
+        '1'{
+            Write-Host "`nping `$target Export"
+            pingExport
+            adminMenu
+        }
+        '2' {
+            Write-Host "`nipconfig /all Export."
+            ipconfigExport
+            adminMenu
+        }
+        '3' {
+            Write-Host "`nsecedit Export."
+            seceditExport
+            adminMenu
+        }
+        '4' {
+            Write-Host "`nget-acl (recursive) Export 4."
+            getaclExport
+            adminMenu 
+        }
+        '5' {
+            Write-Host "`nget-acl of HKey Current User Export"
+            getaclHKExport
+            adminMenu
+        }
+        '6' {
+            Write-Host "`nget the uptime of the host Export"
+            getUptimeExport
+            adminMenu
+        }
+        '7' {
+            Write-Host "`nOpens the Get-ChildItem Menu to view directories and sub directories."
+            getChildItemMenu
+            adminMenu
+        }
+        'Q' {
+            Write-Host "` "
+            Return
+        }
+    }
+}
+
+#This script can be used to create a list of permissions pertaining to a given object.
+#It can also be used to create a baseline permission if there is an alert on changes of permissions.
+function getaclHKExport {
+    Write-Host "` "
+    Get-Acl HKCU:\Software\Microsoft\Windows | Format-list
+    Get-Acl HKCU:\Software\Microsoft\Windows | Format-list | Out-file ./getaclHKCUExport.txt
+    Write-Host "`nget-acl export of HKCU saved to ./getaclHKCUExport.txt."
+}
+
+#Open ChildItem Menu to view directories and subdirectories.
+function getChildItemMenu {
+    Write-Host "` "
+    Get-ChildItem -Directory -Path "C:\Program Files" -Recurse -Force | Out-Gridview
+}
+
+#This is a function to ping a destination and export the results.
+function pingExport {
+    Write-Host "`nWhat host would you like to ping?"
+    $targetHost= Read-Host "`nEnter the IP address or URL"
+    ping $targetHost | Add-Content ./pingOutput.txt -Passthru | Write-Output
+    Write-Host "`n***ping saved to ./pingOutput.txt***"
+}
+
+#This is a function to export the result of ipconfig /all.
+function ipconfigExport {
+    ipconfig /all | Add-Content ./ipconfigAllOutput.txt -Passthru | Write-Output
+    Write-Host "`n***ipconfig /all saved to ./ipconfigAllOutput.txt***"
+}
+
+#This function exports the results of the secedit.
+function seceditExport {
+    secedit /export /cfg ./seceditExport.txt
+    Write-Host "`n***secedit export saved to ./seceditExport.txt***"
+}
+
+#This function gets the current uptime of the system.
+function getUptimeExport {
+    [CmdletBinding()]
+    param (
+    [string]$ComputerName = 'localhost'
+    )
+    
+    foreach ($Computer in $ComputerName){
+        $pc = $computername
+        $os = Get-WmiObject -Class Win32_OperatingSystem -ComputerName $computername
+        $diff = $os.ConvertToDateTime($os.LocalDateTime) - $os.ConvertToDateTime($os.LastBootUpTime)
+    
+        $properties=@{
+            'ComputerName'=$pc;
+            'UptimeDays'=$diff.Days;
+            'UptimeHours'=$diff.Hours;
+            'UptimeMinutes'=$diff.Minutes;
+            'UptimeSeconds'=$diff.Seconds;
+        }
+
+    $obj = New-Object -TypeName PSObject -Property $properties
+    Write-Output $obj
+    $obj | Out-File -filepath ./getuptime_Export.txt
+    }
+}
+
+#This function gets the ACLs for a directory and all sub directories.
+function getaclExport {
+    Write-Host "`nWhat directory would you like to get the ACLs for?"
+    Write-Host "`nExample: C:\Widows\System32\.."
+
+    #If an invalid directory nane is entered the script will accept it. It will eventually save a blank file.
+    #There is potential to validate the input to some degree.
+
+    $targetDir= Read-Host "`nEnter the directory"
+    $targetConfirmation= Read-Host "`nAre you sure that you want to use ($targetDir) as your directory? (Y/N/Q `"Quit`")"
+   
+    if ($targetConfirmation -eq "Y") {
+        Write-Host "`nConfirmed"
+    }   
+    elseif ($targetConfirmation -eq "N") {
+        getaclExport
+        break
+    }
+    elseif ($targetConfirmation -eq "Q") {
+        adminMenu
+        break
+    }
+    else {
+        Write-Host "`nEnter a valid choice!"
+        getaclExport
+        break
+    } 
+    
+    if (($targetDir -eq "C:\") -or ($targetDir -eq "C:\Windows") -or ($targetDir -eq "C:\Program Files") -or ($targetDir -eq "c:\Program Files (x86)")) {
+        Write-Host "`n***Scope too large, choose a new directory.***"
+        getaclExport
+    }
+    else {
+        $targetName= Read-Host "`nName the output file (do NOT use special characters)"
+        $pattern = "[^a-zA-Z0-9]"
+        $targetName= $targetName -replace $pattern, ""
+        Get-ChildItem $targetDir -Recurse | where-object {($_.PsIsContainer)} | Get-ACL | Format-List | Out-File ./permissionsOutput_$targetName.txt
+        Write-Host "`nget-acl exported to ./permissionsOutput_$targetName.txt"
+    }
+}
+
+#This starts the Auditing Tools Script
+adminMenu
